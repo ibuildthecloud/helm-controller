@@ -12,6 +12,7 @@ const (
 	DaemonSetFieldBatchSize                     = "batchSize"
 	DaemonSetFieldContainers                    = "containers"
 	DaemonSetFieldCreated                       = "created"
+	DaemonSetFieldCreatorID                     = "creatorId"
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetFieldDeploymentStrategy            = "deploymentStrategy"
 	DaemonSetFieldFinalizers                    = "finalizers"
@@ -61,6 +62,7 @@ type DaemonSet struct {
 	BatchSize                     string                   `json:"batchSize,omitempty"`
 	Containers                    []Container              `json:"containers,omitempty"`
 	Created                       string                   `json:"created,omitempty"`
+	CreatorID                     string                   `json:"creatorId,omitempty"`
 	DNSPolicy                     string                   `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy          `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string                 `json:"finalizers,omitempty"`

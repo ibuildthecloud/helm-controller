@@ -12,6 +12,7 @@ const (
 	StatefulSetFieldBatchSize                     = "batchSize"
 	StatefulSetFieldContainers                    = "containers"
 	StatefulSetFieldCreated                       = "created"
+	StatefulSetFieldCreatorID                     = "creatorId"
 	StatefulSetFieldDNSPolicy                     = "dnsPolicy"
 	StatefulSetFieldDeploymentStrategy            = "deploymentStrategy"
 	StatefulSetFieldFinalizers                    = "finalizers"
@@ -64,6 +65,7 @@ type StatefulSet struct {
 	BatchSize                     string                     `json:"batchSize,omitempty"`
 	Containers                    []Container                `json:"containers,omitempty"`
 	Created                       string                     `json:"created,omitempty"`
+	CreatorID                     string                     `json:"creatorId,omitempty"`
 	DNSPolicy                     string                     `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy            `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string                   `json:"finalizers,omitempty"`

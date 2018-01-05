@@ -8,10 +8,12 @@ const (
 	DockerCredentialType                 = "dockerCredential"
 	DockerCredentialFieldAnnotations     = "annotations"
 	DockerCredentialFieldCreated         = "created"
+	DockerCredentialFieldCreatorID       = "creatorId"
+	DockerCredentialFieldDescription     = "description"
 	DockerCredentialFieldFinalizers      = "finalizers"
 	DockerCredentialFieldLabels          = "labels"
 	DockerCredentialFieldName            = "name"
-	DockerCredentialFieldNamespace       = "namespace"
+	DockerCredentialFieldNamespaceId     = "namespaceId"
 	DockerCredentialFieldOwnerReferences = "ownerReferences"
 	DockerCredentialFieldProjectID       = "projectId"
 	DockerCredentialFieldRegistries      = "registries"
@@ -23,10 +25,12 @@ type DockerCredential struct {
 	types.Resource
 	Annotations     map[string]string             `json:"annotations,omitempty"`
 	Created         string                        `json:"created,omitempty"`
+	CreatorID       string                        `json:"creatorId,omitempty"`
+	Description     string                        `json:"description,omitempty"`
 	Finalizers      []string                      `json:"finalizers,omitempty"`
 	Labels          map[string]string             `json:"labels,omitempty"`
 	Name            string                        `json:"name,omitempty"`
-	Namespace       string                        `json:"namespace,omitempty"`
+	NamespaceId     string                        `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference              `json:"ownerReferences,omitempty"`
 	ProjectID       string                        `json:"projectId,omitempty"`
 	Registries      map[string]RegistryCredential `json:"registries,omitempty"`

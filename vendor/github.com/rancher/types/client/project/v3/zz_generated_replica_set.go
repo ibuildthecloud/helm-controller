@@ -12,6 +12,7 @@ const (
 	ReplicaSetFieldBatchSize                     = "batchSize"
 	ReplicaSetFieldContainers                    = "containers"
 	ReplicaSetFieldCreated                       = "created"
+	ReplicaSetFieldCreatorID                     = "creatorId"
 	ReplicaSetFieldDNSPolicy                     = "dnsPolicy"
 	ReplicaSetFieldDeploymentStrategy            = "deploymentStrategy"
 	ReplicaSetFieldFinalizers                    = "finalizers"
@@ -59,6 +60,7 @@ type ReplicaSet struct {
 	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`

@@ -8,10 +8,13 @@ const (
 	SSHAuthType                 = "sshAuth"
 	SSHAuthFieldAnnotations     = "annotations"
 	SSHAuthFieldCreated         = "created"
+	SSHAuthFieldCreatorID       = "creatorId"
+	SSHAuthFieldDescription     = "description"
 	SSHAuthFieldFinalizers      = "finalizers"
+	SSHAuthFieldFingerprint     = "certFingerprint"
 	SSHAuthFieldLabels          = "labels"
 	SSHAuthFieldName            = "name"
-	SSHAuthFieldNamespace       = "namespace"
+	SSHAuthFieldNamespaceId     = "namespaceId"
 	SSHAuthFieldOwnerReferences = "ownerReferences"
 	SSHAuthFieldPrivateKey      = "privateKey"
 	SSHAuthFieldProjectID       = "projectId"
@@ -23,10 +26,13 @@ type SSHAuth struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
+	Fingerprint     string            `json:"certFingerprint,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
-	Namespace       string            `json:"namespace,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	PrivateKey      string            `json:"privateKey,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty"`

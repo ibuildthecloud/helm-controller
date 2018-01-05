@@ -6,12 +6,15 @@ import (
 
 const (
 	CertificateType                         = "certificate"
-	CertificateFieldAlgorithm               = "Algorithm"
+	CertificateFieldAlgorithm               = "algorithm"
 	CertificateFieldAnnotations             = "annotations"
 	CertificateFieldCN                      = "cn"
 	CertificateFieldCertFingerprint         = "certFingerprint"
 	CertificateFieldCerts                   = "certs"
 	CertificateFieldCreated                 = "created"
+	CertificateFieldCreatorID               = "creatorId"
+	CertificateFieldDescription             = "description"
+	CertificateFieldExpiresAt               = "expiresAt"
 	CertificateFieldFinalizers              = "finalizers"
 	CertificateFieldIssuedAt                = "issuedAt"
 	CertificateFieldIssuer                  = "issuer"
@@ -19,7 +22,7 @@ const (
 	CertificateFieldKeySize                 = "keySize"
 	CertificateFieldLabels                  = "labels"
 	CertificateFieldName                    = "name"
-	CertificateFieldNamespace               = "namespace"
+	CertificateFieldNamespaceId             = "namespaceId"
 	CertificateFieldOwnerReferences         = "ownerReferences"
 	CertificateFieldProjectID               = "projectId"
 	CertificateFieldRemoved                 = "removed"
@@ -31,12 +34,15 @@ const (
 
 type Certificate struct {
 	types.Resource
-	Algorithm               string            `json:"Algorithm,omitempty"`
+	Algorithm               string            `json:"algorithm,omitempty"`
 	Annotations             map[string]string `json:"annotations,omitempty"`
 	CN                      string            `json:"cn,omitempty"`
 	CertFingerprint         string            `json:"certFingerprint,omitempty"`
 	Certs                   string            `json:"certs,omitempty"`
 	Created                 string            `json:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty"`
+	Description             string            `json:"description,omitempty"`
+	ExpiresAt               string            `json:"expiresAt,omitempty"`
 	Finalizers              []string          `json:"finalizers,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`
@@ -44,12 +50,12 @@ type Certificate struct {
 	KeySize                 string            `json:"keySize,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty"`
 	Name                    string            `json:"name,omitempty"`
-	Namespace               string            `json:"namespace,omitempty"`
+	NamespaceId             string            `json:"namespaceId,omitempty"`
 	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectID               string            `json:"projectId,omitempty"`
 	Removed                 string            `json:"removed,omitempty"`
 	SerialNumber            string            `json:"serialNumber,omitempty"`
-	SubjectAlternativeNames string            `json:"subjectAlternativeNames,omitempty"`
+	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty"`
 	Uuid                    string            `json:"uuid,omitempty"`
 	Version                 string            `json:"version,omitempty"`
 }

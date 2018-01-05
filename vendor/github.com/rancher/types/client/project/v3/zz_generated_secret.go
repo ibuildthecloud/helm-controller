@@ -8,7 +8,9 @@ const (
 	SecretType                 = "secret"
 	SecretFieldAnnotations     = "annotations"
 	SecretFieldCreated         = "created"
+	SecretFieldCreatorID       = "creatorId"
 	SecretFieldData            = "data"
+	SecretFieldDescription     = "description"
 	SecretFieldFinalizers      = "finalizers"
 	SecretFieldKind            = "kind"
 	SecretFieldLabels          = "labels"
@@ -25,7 +27,9 @@ type Secret struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Kind            string            `json:"kind,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`

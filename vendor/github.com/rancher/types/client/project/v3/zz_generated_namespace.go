@@ -9,6 +9,8 @@ const (
 	NamespaceFieldAnnotations          = "annotations"
 	NamespaceFieldAnswers              = "answers"
 	NamespaceFieldCreated              = "created"
+	NamespaceFieldCreatorID            = "creatorId"
+	NamespaceFieldDescription          = "description"
 	NamespaceFieldExternalID           = "externalId"
 	NamespaceFieldFinalizers           = "finalizers"
 	NamespaceFieldLabels               = "labels"
@@ -16,6 +18,7 @@ const (
 	NamespaceFieldOwnerReferences      = "ownerReferences"
 	NamespaceFieldProjectID            = "projectId"
 	NamespaceFieldPrune                = "prune"
+	NamespaceFieldReleases             = "releases"
 	NamespaceFieldRemoved              = "removed"
 	NamespaceFieldState                = "state"
 	NamespaceFieldStatus               = "status"
@@ -31,6 +34,8 @@ type Namespace struct {
 	Annotations          map[string]string      `json:"annotations,omitempty"`
 	Answers              map[string]interface{} `json:"answers,omitempty"`
 	Created              string                 `json:"created,omitempty"`
+	CreatorID            string                 `json:"creatorId,omitempty"`
+	Description          string                 `json:"description,omitempty"`
 	ExternalID           string                 `json:"externalId,omitempty"`
 	Finalizers           []string               `json:"finalizers,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty"`
@@ -38,6 +43,7 @@ type Namespace struct {
 	OwnerReferences      []OwnerReference       `json:"ownerReferences,omitempty"`
 	ProjectID            string                 `json:"projectId,omitempty"`
 	Prune                *bool                  `json:"prune,omitempty"`
+	Releases             map[string]ReleaseInfo `json:"releases,omitempty"`
 	Removed              string                 `json:"removed,omitempty"`
 	State                string                 `json:"state,omitempty"`
 	Status               *NamespaceStatus       `json:"status,omitempty"`

@@ -2,59 +2,53 @@ package schema
 
 import (
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/mapper"
 	"k8s.io/api/core/v1"
 )
 
 func secretTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v1.Secret{},
+			&m.AnnotationField{Field: "description"},
+			m.AnnotationField{Field: "projectId", IgnoreDefinition: true},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/service-account-token",
 				Value: "serviceAccountToken",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/dockercfg",
 				Value: "dockerCredential",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/dockerconfigjson",
 				Value: "dockerCredential",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/basic-auth",
 				Value: "basicAuth",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/ssh-auth",
 				Value: "sshAuth",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/ssh-auth",
 				Value: "sshAuth",
 			},
 			m.SetValue{
 				Field: "type",
-				To:    "type",
 				IfEq:  "kubernetes.io/tls",
 				Value: "certificate",
 			},
 			&m.Move{From: "type", To: "kind"},
-			&mapper.NamespaceIDMapper{},
 			m.Condition{
 				Field: "kind",
 				Value: "sshAuth",
@@ -72,6 +66,7 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 						Value:            "sshAuth",
 						IgnoreDefinition: true,
 					},
+					m.AnnotationField{Field: "fingerprint", IgnoreDefinition: true},
 				},
 			},
 			m.Condition{
@@ -126,6 +121,7 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 					m.AnnotationField{Field: "version", IgnoreDefinition: true},
 					m.AnnotationField{Field: "issuer", IgnoreDefinition: true},
 					m.AnnotationField{Field: "issuedAt", IgnoreDefinition: true},
+					m.AnnotationField{Field: "expiresAt", IgnoreDefinition: true},
 					m.AnnotationField{Field: "algorithm", IgnoreDefinition: true},
 					m.AnnotationField{Field: "serialNumber", IgnoreDefinition: true},
 					m.AnnotationField{Field: "keySize", IgnoreDefinition: true},
@@ -191,19 +187,11 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 						To:   "caCrt",
 					},
 					m.UntypedMove{
-						From: "data/namespace",
-						To:   "namespace",
-					},
-					m.UntypedMove{
 						From: "data/token",
 						To:   "token",
 					},
 					m.Base64{
 						Field:            "caCrt",
-						IgnoreDefinition: true,
-					},
-					m.Base64{
-						Field:            "namespace",
 						IgnoreDefinition: true,
 					},
 					m.Base64{
@@ -231,25 +219,50 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 				}
 				return f
 			})
-		}, projectOverride{}).
-		MustImportAndCustomize(&Version, v3.ServiceAccountToken{}, func(schema *types.Schema) {
+		}, projectOverride{}, struct {
+			Description string `json:"description"`
+		}{}).
+		Init(func(schemas *types.Schemas) *types.Schemas {
+			return addSecretSubtypes(schemas,
+				v3.ServiceAccountToken{},
+				v3.DockerCredential{},
+				v3.Certificate{},
+				v3.BasicAuth{},
+				v3.SSHAuth{})
+		})
+}
+
+func addSecretSubtypes(schemas *types.Schemas, objs ...interface{}) *types.Schemas {
+	namespaced := []string{"secret"}
+
+	for _, obj := range objs {
+		schemas.MustImportAndCustomize(&Version, obj, func(schema *types.Schema) {
 			schema.BaseType = "secret"
 			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
-		}, projectOverride{}).
-		MustImportAndCustomize(&Version, v3.DockerCredential{}, func(schema *types.Schema) {
-			schema.BaseType = "secret"
-			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
-		}, projectOverride{}).
-		MustImportAndCustomize(&Version, v3.Certificate{}, func(schema *types.Schema) {
-			schema.BaseType = "secret"
-			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
-		}, projectOverride{}).
-		MustImportAndCustomize(&Version, v3.BasicAuth{}, func(schema *types.Schema) {
-			schema.BaseType = "secret"
-			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
-		}, projectOverride{}).
-		MustImportAndCustomize(&Version, v3.SSHAuth{}, func(schema *types.Schema) {
-			schema.BaseType = "secret"
-			schema.Mapper = schemas.Schema(&Version, "secret").Mapper
+			namespaced = append(namespaced, schema.ID)
 		}, projectOverride{})
+	}
+
+	for _, name := range namespaced {
+		baseSchema := schemas.Schema(&Version, name)
+
+		newFields := map[string]types.Field{}
+		for name, field := range baseSchema.ResourceFields {
+			if name == "namespaceId" {
+				field.Required = false
+			}
+			newFields[name] = field
+		}
+
+		schema := *baseSchema
+		schema.ID = "namespaced" + convert.Capitalize(schema.ID)
+		schema.PluralName = "namespaced" + convert.Capitalize(schema.PluralName)
+		schema.CodeName = "Namespaced" + schema.CodeName
+		schema.CodeNamePlural = "Namespaced" + schema.CodeNamePlural
+		schemas.AddSchema(schema)
+
+		baseSchema.ResourceFields = newFields
+	}
+
+	return schemas
 }

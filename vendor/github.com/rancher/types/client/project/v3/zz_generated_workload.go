@@ -12,8 +12,10 @@ const (
 	WorkloadFieldBatchSize                     = "batchSize"
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
+	WorkloadFieldCreatorID                     = "creatorId"
 	WorkloadFieldDNSPolicy                     = "dnsPolicy"
 	WorkloadFieldDeploymentStrategy            = "deploymentStrategy"
+	WorkloadFieldDescription                   = "description"
 	WorkloadFieldFinalizers                    = "finalizers"
 	WorkloadFieldFsgid                         = "fsgid"
 	WorkloadFieldGids                          = "gids"
@@ -60,8 +62,10 @@ type Workload struct {
 	BatchSize                     string                 `json:"batchSize,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty"`
 	Created                       string                 `json:"created,omitempty"`
+	CreatorID                     string                 `json:"creatorId,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty"`
 	DeploymentStrategy            *DeployStrategy        `json:"deploymentStrategy,omitempty"`
+	Description                   string                 `json:"description,omitempty"`
 	Finalizers                    []string               `json:"finalizers,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty"`

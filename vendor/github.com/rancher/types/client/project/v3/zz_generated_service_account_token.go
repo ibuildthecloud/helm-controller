@@ -11,11 +11,12 @@ const (
 	ServiceAccountTokenFieldAnnotations     = "annotations"
 	ServiceAccountTokenFieldCACRT           = "caCrt"
 	ServiceAccountTokenFieldCreated         = "created"
+	ServiceAccountTokenFieldCreatorID       = "creatorId"
+	ServiceAccountTokenFieldDescription     = "description"
 	ServiceAccountTokenFieldFinalizers      = "finalizers"
 	ServiceAccountTokenFieldLabels          = "labels"
 	ServiceAccountTokenFieldName            = "name"
-	ServiceAccountTokenFieldNamespace       = "namespace"
-	ServiceAccountTokenFieldNamespaceID     = "namespaceId"
+	ServiceAccountTokenFieldNamespaceId     = "namespaceId"
 	ServiceAccountTokenFieldOwnerReferences = "ownerReferences"
 	ServiceAccountTokenFieldProjectID       = "projectId"
 	ServiceAccountTokenFieldRemoved         = "removed"
@@ -30,11 +31,12 @@ type ServiceAccountToken struct {
 	Annotations     map[string]string `json:"annotations,omitempty"`
 	CACRT           string            `json:"caCrt,omitempty"`
 	Created         string            `json:"created,omitempty"`
+	CreatorID       string            `json:"creatorId,omitempty"`
+	Description     string            `json:"description,omitempty"`
 	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
-	Namespace       string            `json:"namespace,omitempty"`
-	NamespaceID     string            `json:"namespaceId,omitempty"`
+	NamespaceId     string            `json:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
 	ProjectID       string            `json:"projectId,omitempty"`
 	Removed         string            `json:"removed,omitempty"`

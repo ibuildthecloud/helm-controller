@@ -79,7 +79,7 @@ type deployOverride struct {
 
 type projectOverride struct {
 	types.Namespaced
-	ProjectID string `norman:"type=reference[/v3/schemas/project]"`
+	ProjectID string `norman:"type=reference[/v3/schemas/project],noupdate"`
 }
 
 type Target struct {
@@ -87,4 +87,12 @@ type Target struct {
 	NotReadyAddresses []string `json:"notReadyAddresses"`
 	Port              *int32   `json:"port"`
 	Protocol          string   `json:"protocol" norman:"type=enum,options=TCP|UDP"`
+}
+
+type ReleaseInfo struct {
+	Name              string `json:"name"`
+	Version           string `json:"version"`
+	CreateTimestamp   string `json:"createTimestamp"`
+	ModifiedAt        string `json:"modifiedAt"`
+	TemplateVersionID string `json:"templateVersionId"`
 }
