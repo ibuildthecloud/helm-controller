@@ -12,14 +12,11 @@ import (
 
 	"strconv"
 
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/net/context"
-	"k8s.io/api/core/v1"
-	"github.com/rancher/norman/types/convert"
 )
 
 const (
@@ -50,10 +47,10 @@ func (l *Lifecycle) writeTempFolder(templateVersion *v3.TemplateVersion) (string
 }
 
 // startTiller start tiller server and return the listening address of the grpc address
-func startTiller(context context.Context, port, namespace string) error {
-	// todo: we need to pass impersonation kubeconfig
-	cmd := exec.Command(tillerName, "--listen", ":"+port)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace))
+func startTiller(context context.Context, port, probePort, namespace, kubeConfigPath, user string, groups []string) error {
+	groupsAsString := strings.Join(groups, ",")
+	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort, "--user", user, "--groups", groupsAsString)
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace)}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
@@ -73,20 +70,17 @@ func generateRandomPort() string {
 	return strconv.Itoa(port)
 }
 
-func installCharts(rootDir, port string, obj *v1.Namespace) error {
+func installCharts(rootDir, port string, obj *v3.Stack) error {
 	setValues := []string{}
-	if obj.Annotations["field.cattle.io/answers"] != "" {
-		answers := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(obj.Annotations["field.cattle.io/answers"]), &answers); err != nil {
-			return err
-		}
+	if obj.Spec.Answers != nil {
+		answers := obj.Spec.Answers
 		result := []string{}
 		for k, v := range answers {
-			result = append(result, fmt.Sprintf("%s=%s", k, convert.ToString(v)))
+			result = append(result, fmt.Sprintf("%s=%s", k, v))
 		}
 		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
-	commands := append([]string{"install", "--namespace", obj.Name, "--name", obj.Name}, setValues...)
+	commands := append([]string{"install", "--namespace", obj.Spec.InstallNamespace, "--name", obj.Name}, setValues...)
 	commands = append(commands, rootDir)
 
 	cmd := exec.Command(helmName, commands...)
@@ -102,7 +96,7 @@ func installCharts(rootDir, port string, obj *v1.Namespace) error {
 	return nil
 }
 
-func deleteCharts(rootDir, port string, obj *v1.Namespace) error {
+func deleteCharts(port string, obj *v3.Stack) error {
 	cmd := exec.Command(helmName, "delete", "--purge", obj.Name)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
 	cmd.Stdout = os.Stdout

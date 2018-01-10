@@ -49,7 +49,12 @@ func run(kubeConfigFile string) error {
 		return err
 	}
 
-	controller.Register(management)
+	clusterContext, err := config.NewClusterContext(management, kubeConfig, "local")
+	if err != nil {
+		return err
+	}
+
+	controller.Register(clusterContext)
 
 	return management.StartAndWait()
 }
