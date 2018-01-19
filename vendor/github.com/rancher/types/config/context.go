@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/norman/types"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	extv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -64,6 +65,7 @@ func (c *ManagementContext) controllers() []controller.Starter {
 }
 
 type ClusterContext struct {
+	Schemas           *types.Schemas
 	Management        *ManagementContext
 	ClusterName       string
 	RESTConfig        rest.Config
@@ -89,6 +91,7 @@ func (w *ClusterContext) controllers() []controller.Starter {
 
 func (w *ClusterContext) WorkloadContext() *WorkloadContext {
 	return &WorkloadContext{
+		Schemas:           w.Schemas,
 		ClusterName:       w.ClusterName,
 		RESTConfig:        w.RESTConfig,
 		UnversionedClient: w.UnversionedClient,
@@ -103,6 +106,7 @@ func (w *ClusterContext) WorkloadContext() *WorkloadContext {
 }
 
 type WorkloadContext struct {
+	Schemas           *types.Schemas
 	ClusterName       string
 	RESTConfig        rest.Config
 	UnversionedClient rest.Interface
@@ -210,6 +214,10 @@ func NewClusterContext(managementConfig, config rest.Config, clusterName string)
 	context := &ClusterContext{
 		RESTConfig:  config,
 		ClusterName: clusterName,
+		Schemas: types.NewSchemas().
+			AddSchemas(managementSchema.Schemas).
+			AddSchemas(clusterSchema.Schemas).
+			AddSchemas(projectSchema.Schemas),
 	}
 
 	context.Management, err = NewManagementContext(managementConfig)
@@ -262,7 +270,7 @@ func NewClusterContext(managementConfig, config rest.Config, clusterName string)
 }
 
 func (w *ClusterContext) Start(ctx context.Context) error {
-	logrus.Info("Starting cluster controllers")
+	logrus.Info("Starting cluster controllers for ", w.ClusterName)
 	controllers := w.Management.controllers()
 	controllers = append(controllers, w.controllers()...)
 	return controller.SyncThenStart(ctx, 5, controllers...)

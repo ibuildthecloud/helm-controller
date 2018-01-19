@@ -45,7 +45,8 @@ type ComponentStatusLister interface {
 type ComponentStatusController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
-	AddHandler(handler ComponentStatusHandlerFunc)
+	AddHandler(name string, handler ComponentStatusHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -54,17 +55,19 @@ type ComponentStatusController interface {
 type ComponentStatusInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.ComponentStatus) (*v1.ComponentStatus, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	Update(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ComponentStatusList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
-	AddSyncHandler(sync ComponentStatusHandlerFunc)
+	AddHandler(name string, sync ComponentStatusHandlerFunc)
 	AddLifecycle(name string, lifecycle ComponentStatusLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle)
 }
 
 type componentStatusLister struct {
@@ -108,8 +111,8 @@ func (c *componentStatusController) Lister() ComponentStatusLister {
 	}
 }
 
-func (c *componentStatusController) AddHandler(handler ComponentStatusHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *componentStatusController) AddHandler(name string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -117,6 +120,24 @@ func (c *componentStatusController) AddHandler(handler ComponentStatusHandlerFun
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.ComponentStatus))
+	})
+}
+
+func (c *componentStatusController) AddClusterScopedHandler(name, cluster string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.ComponentStatus))
 	})
 }
@@ -175,8 +196,8 @@ func (s *componentStatusClient) Get(name string, opts metav1.GetOptions) (*v1.Co
 	return obj.(*v1.ComponentStatus), err
 }
 
-func (s *componentStatusClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *componentStatusClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.ComponentStatus), err
 }
 
@@ -189,8 +210,8 @@ func (s *componentStatusClient) Delete(name string, options *metav1.DeleteOption
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *componentStatusClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *componentStatusClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *componentStatusClient) List(opts metav1.ListOptions) (*ComponentStatusList, error) {
@@ -212,11 +233,20 @@ func (s *componentStatusClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *componentStatusClient) AddSyncHandler(sync ComponentStatusHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *componentStatusClient) AddHandler(name string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *componentStatusClient) AddLifecycle(name string, lifecycle ComponentStatusLifecycle) {
-	sync := NewComponentStatusLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewComponentStatusLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *componentStatusClient) AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *componentStatusClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle) {
+	sync := NewComponentStatusLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

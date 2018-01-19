@@ -45,7 +45,8 @@ type NamespacedServiceAccountTokenLister interface {
 type NamespacedServiceAccountTokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedServiceAccountTokenLister
-	AddHandler(handler NamespacedServiceAccountTokenHandlerFunc)
+	AddHandler(name string, handler NamespacedServiceAccountTokenHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespacedServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -54,17 +55,19 @@ type NamespacedServiceAccountTokenController interface {
 type NamespacedServiceAccountTokenInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
 	Update(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedServiceAccountTokenController
-	AddSyncHandler(sync NamespacedServiceAccountTokenHandlerFunc)
+	AddHandler(name string, sync NamespacedServiceAccountTokenHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedServiceAccountTokenLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespacedServiceAccountTokenHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedServiceAccountTokenLifecycle)
 }
 
 type namespacedServiceAccountTokenLister struct {
@@ -108,8 +111,8 @@ func (c *namespacedServiceAccountTokenController) Lister() NamespacedServiceAcco
 	}
 }
 
-func (c *namespacedServiceAccountTokenController) AddHandler(handler NamespacedServiceAccountTokenHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedServiceAccountTokenController) AddHandler(name string, handler NamespacedServiceAccountTokenHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -117,6 +120,24 @@ func (c *namespacedServiceAccountTokenController) AddHandler(handler NamespacedS
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*NamespacedServiceAccountToken))
+	})
+}
+
+func (c *namespacedServiceAccountTokenController) AddClusterScopedHandler(name, cluster string, handler NamespacedServiceAccountTokenHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*NamespacedServiceAccountToken))
 	})
 }
@@ -175,8 +196,8 @@ func (s *namespacedServiceAccountTokenClient) Get(name string, opts metav1.GetOp
 	return obj.(*NamespacedServiceAccountToken), err
 }
 
-func (s *namespacedServiceAccountTokenClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *namespacedServiceAccountTokenClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*NamespacedServiceAccountToken), err
 }
 
@@ -189,8 +210,8 @@ func (s *namespacedServiceAccountTokenClient) Delete(name string, options *metav
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *namespacedServiceAccountTokenClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *namespacedServiceAccountTokenClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *namespacedServiceAccountTokenClient) List(opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error) {
@@ -212,11 +233,20 @@ func (s *namespacedServiceAccountTokenClient) DeleteCollection(deleteOpts *metav
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedServiceAccountTokenClient) AddSyncHandler(sync NamespacedServiceAccountTokenHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedServiceAccountTokenClient) AddHandler(name string, sync NamespacedServiceAccountTokenHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedServiceAccountTokenClient) AddLifecycle(name string, lifecycle NamespacedServiceAccountTokenLifecycle) {
-	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *namespacedServiceAccountTokenClient) AddClusterScopedHandler(name, clusterName string, sync NamespacedServiceAccountTokenHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespacedServiceAccountTokenClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedServiceAccountTokenLifecycle) {
+	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

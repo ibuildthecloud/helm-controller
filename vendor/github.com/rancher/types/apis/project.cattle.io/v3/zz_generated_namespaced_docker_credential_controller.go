@@ -45,7 +45,8 @@ type NamespacedDockerCredentialLister interface {
 type NamespacedDockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedDockerCredentialLister
-	AddHandler(handler NamespacedDockerCredentialHandlerFunc)
+	AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -54,17 +55,19 @@ type NamespacedDockerCredentialController interface {
 type NamespacedDockerCredentialInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
 	Get(name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
 	Update(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedDockerCredentialController
-	AddSyncHandler(sync NamespacedDockerCredentialHandlerFunc)
+	AddHandler(name string, sync NamespacedDockerCredentialHandlerFunc)
 	AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync NamespacedDockerCredentialHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle)
 }
 
 type namespacedDockerCredentialLister struct {
@@ -108,8 +111,8 @@ func (c *namespacedDockerCredentialController) Lister() NamespacedDockerCredenti
 	}
 }
 
-func (c *namespacedDockerCredentialController) AddHandler(handler NamespacedDockerCredentialHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *namespacedDockerCredentialController) AddHandler(name string, handler NamespacedDockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -117,6 +120,24 @@ func (c *namespacedDockerCredentialController) AddHandler(handler NamespacedDock
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*NamespacedDockerCredential))
+	})
+}
+
+func (c *namespacedDockerCredentialController) AddClusterScopedHandler(name, cluster string, handler NamespacedDockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*NamespacedDockerCredential))
 	})
 }
@@ -175,8 +196,8 @@ func (s *namespacedDockerCredentialClient) Get(name string, opts metav1.GetOptio
 	return obj.(*NamespacedDockerCredential), err
 }
 
-func (s *namespacedDockerCredentialClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*NamespacedDockerCredential, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *namespacedDockerCredentialClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*NamespacedDockerCredential), err
 }
 
@@ -189,8 +210,8 @@ func (s *namespacedDockerCredentialClient) Delete(name string, options *metav1.D
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *namespacedDockerCredentialClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *namespacedDockerCredentialClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *namespacedDockerCredentialClient) List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error) {
@@ -212,11 +233,20 @@ func (s *namespacedDockerCredentialClient) DeleteCollection(deleteOpts *metav1.D
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespacedDockerCredentialClient) AddSyncHandler(sync NamespacedDockerCredentialHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *namespacedDockerCredentialClient) AddHandler(name string, sync NamespacedDockerCredentialHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *namespacedDockerCredentialClient) AddLifecycle(name string, lifecycle NamespacedDockerCredentialLifecycle) {
-	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *namespacedDockerCredentialClient) AddClusterScopedHandler(name, clusterName string, sync NamespacedDockerCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *namespacedDockerCredentialClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle) {
+	sync := NewNamespacedDockerCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }
