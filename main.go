@@ -49,7 +49,7 @@ func run(kubeConfigFile string) error {
 		return err
 	}
 
-	clusterContext, err := config.NewClusterContext(management, kubeConfig, "local")
+	clusterContext, err := config.NewClusterContext(*kubeConfig, *kubeConfig, "local")
 	if err != nil {
 		return err
 	}
