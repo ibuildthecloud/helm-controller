@@ -10,7 +10,6 @@ const (
 	ConfigMapFieldCreated         = "created"
 	ConfigMapFieldCreatorID       = "creatorId"
 	ConfigMapFieldData            = "data"
-	ConfigMapFieldFinalizers      = "finalizers"
 	ConfigMapFieldLabels          = "labels"
 	ConfigMapFieldName            = "name"
 	ConfigMapFieldOwnerReferences = "ownerReferences"
@@ -24,7 +23,6 @@ type ConfigMap struct {
 	Created         string            `json:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty"`
-	Finalizers      []string          `json:"finalizers,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`

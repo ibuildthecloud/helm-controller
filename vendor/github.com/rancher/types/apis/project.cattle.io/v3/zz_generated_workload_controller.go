@@ -45,7 +45,8 @@ type WorkloadLister interface {
 type WorkloadController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() WorkloadLister
-	AddHandler(handler WorkloadHandlerFunc)
+	AddHandler(name string, handler WorkloadHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler WorkloadHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -54,17 +55,19 @@ type WorkloadController interface {
 type WorkloadInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*Workload) (*Workload, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*Workload, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Workload, error)
 	Get(name string, opts metav1.GetOptions) (*Workload, error)
 	Update(*Workload) (*Workload, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*WorkloadList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() WorkloadController
-	AddSyncHandler(sync WorkloadHandlerFunc)
+	AddHandler(name string, sync WorkloadHandlerFunc)
 	AddLifecycle(name string, lifecycle WorkloadLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync WorkloadHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle WorkloadLifecycle)
 }
 
 type workloadLister struct {
@@ -108,8 +111,8 @@ func (c *workloadController) Lister() WorkloadLister {
 	}
 }
 
-func (c *workloadController) AddHandler(handler WorkloadHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *workloadController) AddHandler(name string, handler WorkloadHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -117,6 +120,24 @@ func (c *workloadController) AddHandler(handler WorkloadHandlerFunc) {
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*Workload))
+	})
+}
+
+func (c *workloadController) AddClusterScopedHandler(name, cluster string, handler WorkloadHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*Workload))
 	})
 }
@@ -175,8 +196,8 @@ func (s *workloadClient) Get(name string, opts metav1.GetOptions) (*Workload, er
 	return obj.(*Workload), err
 }
 
-func (s *workloadClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*Workload, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *workloadClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*Workload, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*Workload), err
 }
 
@@ -189,8 +210,8 @@ func (s *workloadClient) Delete(name string, options *metav1.DeleteOptions) erro
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *workloadClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *workloadClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *workloadClient) List(opts metav1.ListOptions) (*WorkloadList, error) {
@@ -212,11 +233,20 @@ func (s *workloadClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, list
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *workloadClient) AddSyncHandler(sync WorkloadHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *workloadClient) AddHandler(name string, sync WorkloadHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *workloadClient) AddLifecycle(name string, lifecycle WorkloadLifecycle) {
-	sync := NewWorkloadLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewWorkloadLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *workloadClient) AddClusterScopedHandler(name, clusterName string, sync WorkloadHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *workloadClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle WorkloadLifecycle) {
+	sync := NewWorkloadLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

@@ -46,7 +46,8 @@ type DeploymentLister interface {
 type DeploymentController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
-	AddHandler(handler DeploymentHandlerFunc)
+	AddHandler(name string, handler DeploymentHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -55,17 +56,19 @@ type DeploymentController interface {
 type DeploymentInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1beta2.Deployment) (*v1beta2.Deployment, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1beta2.Deployment, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta2.Deployment, error)
 	Get(name string, opts metav1.GetOptions) (*v1beta2.Deployment, error)
 	Update(*v1beta2.Deployment) (*v1beta2.Deployment, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*DeploymentList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
-	AddSyncHandler(sync DeploymentHandlerFunc)
+	AddHandler(name string, sync DeploymentHandlerFunc)
 	AddLifecycle(name string, lifecycle DeploymentLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync DeploymentHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle DeploymentLifecycle)
 }
 
 type deploymentLister struct {
@@ -109,8 +112,8 @@ func (c *deploymentController) Lister() DeploymentLister {
 	}
 }
 
-func (c *deploymentController) AddHandler(handler DeploymentHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *deploymentController) AddHandler(name string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -118,6 +121,24 @@ func (c *deploymentController) AddHandler(handler DeploymentHandlerFunc) {
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1beta2.Deployment))
+	})
+}
+
+func (c *deploymentController) AddClusterScopedHandler(name, cluster string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1beta2.Deployment))
 	})
 }
@@ -176,8 +197,8 @@ func (s *deploymentClient) Get(name string, opts metav1.GetOptions) (*v1beta2.De
 	return obj.(*v1beta2.Deployment), err
 }
 
-func (s *deploymentClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1beta2.Deployment, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *deploymentClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta2.Deployment, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1beta2.Deployment), err
 }
 
@@ -190,8 +211,8 @@ func (s *deploymentClient) Delete(name string, options *metav1.DeleteOptions) er
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *deploymentClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *deploymentClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *deploymentClient) List(opts metav1.ListOptions) (*DeploymentList, error) {
@@ -213,11 +234,20 @@ func (s *deploymentClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *deploymentClient) AddSyncHandler(sync DeploymentHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *deploymentClient) AddHandler(name string, sync DeploymentHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *deploymentClient) AddLifecycle(name string, lifecycle DeploymentLifecycle) {
-	sync := NewDeploymentLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *deploymentClient) AddClusterScopedHandler(name, clusterName string, sync DeploymentHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *deploymentClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle DeploymentLifecycle) {
+	sync := NewDeploymentLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

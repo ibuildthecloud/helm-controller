@@ -66,7 +66,6 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 			&m.AnnotationField{Field: "templates", Object: true},
 			&m.AnnotationField{Field: "prune"},
 			&m.AnnotationField{Field: "answers", Object: true},
-			&m.AnnotationField{Field: "releases", Object: true},
 		).
 		MustImport(version, v1.Namespace{}, struct {
 			Description string                 `json:"description"`
@@ -76,7 +75,6 @@ func NamespaceTypes(version *types.APIVersion, schemas *types.Schemas) *types.Sc
 			Prune       bool                   `json:"prune"`
 			ExternalID  string                 `json:"externalId"`
 			Tags        []string               `json:"tags"`
-			Releases    map[string]ReleaseInfo `json:"releases"`
 		}{})
 }
 
@@ -252,7 +250,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 			m.Move{From: "args", To: "command"},
 			m.Move{From: "livenessProbe", To: "healthcheck"},
 			m.Move{From: "readinessProbe", To: "readycheck"},
-			m.Move{From: "imagePullPolicy", To: "pullPolicy"},
+			m.Move{From: "imagePullPolicy", To: "pullPolicy", DestDefined: true},
 			mapper.EnvironmentMapper{},
 			&m.Embed{Field: "securityContext"},
 			&m.Embed{Field: "lifecycle"},
@@ -316,9 +314,10 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.PodSpec{}, struct {
 			Scheduling *Scheduling
 			NodeName   string `norman:"type=reference[node]"`
-			Net        string
-			PID        string
-			IPC        string
+			Net        string `norman:"type=enum,options=pod|host,default=pod"`
+			PID        string `norman:"type=enum,options=pod|host,default=pod"`
+			IPC        string `norman:"type=enum,options=pod|host,default=pod"`
+			PullPolicy string `norman:"type=enum,options=Always|Never|IfNotPresent,default=IfNotPresent"`
 		}{}).
 		MustImport(&Version, v1.Pod{}, projectOverride{}, struct {
 			Description string `json:"description"`

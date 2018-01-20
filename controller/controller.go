@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"net/url"
 )
 
 const (
@@ -54,9 +55,13 @@ func (l *Lifecycle) Create(obj *v3.Stack) (*v3.Stack, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
-	templateVersionID := obj.Spec.TemplateVersionID
-	if templateVersionID != "" {
+	externalID := obj.Spec.ExternalID
+	if externalID != "" {
 		if err := l.ensureNamespace(obj); err != nil {
+			return obj, err
+		}
+		templateVersionID, err := parseExternalID(externalID)
+		if err != nil {
 			return obj, err
 		}
 		if err := l.Run(obj, "install", templateVersionID); err != nil {
@@ -87,9 +92,13 @@ func (l *Lifecycle) Updated(obj *v3.Stack) (*v3.Stack, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
-	templateVersionID := obj.Spec.TemplateVersionID
-	if templateVersionID != "" {
+	externalID := obj.Spec.ExternalID
+	if externalID != "" {
 		if err := l.ensureNamespace(obj); err != nil {
+			return obj, err
+		}
+		templateVersionID, err := parseExternalID(externalID)
+		if err != nil {
 			return obj, err
 		}
 		templateVersion, err := l.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
@@ -132,8 +141,12 @@ func (l *Lifecycle) Remove(obj *v3.Stack) (*v3.Stack, error) {
 	if !l.isCurrentProject(obj) {
 		return obj, nil
 	}
-	templateVersionID := obj.Spec.TemplateVersionID
-	if templateVersionID != "" {
+	externalID := obj.Spec.ExternalID
+	if externalID != "" {
+		templateVersionID, err := parseExternalID(externalID)
+		if err != nil {
+			return obj, err
+		}
 		if err := l.Run(obj, "delete", templateVersionID); err != nil {
 			return obj, err
 		}
@@ -220,4 +233,16 @@ func (l *Lifecycle) ensureNamespace(obj *v3.Stack) error {
 		}
 	}
 	return nil
+}
+
+func parseExternalID(externalID string) (string, error) {
+	values, err := url.ParseQuery(externalID)
+	if err != nil {
+		return "", err
+	}
+	catalog := values.Get("catalog://?catalog")
+	base := values.Get("base")
+	template := values.Get("template")
+	version := values.Get("version")
+	return strings.Join([]string{catalog, base, template, version}, "-"), nil
 }

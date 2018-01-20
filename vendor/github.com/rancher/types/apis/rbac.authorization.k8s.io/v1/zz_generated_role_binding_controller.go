@@ -46,7 +46,8 @@ type RoleBindingLister interface {
 type RoleBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() RoleBindingLister
-	AddHandler(handler RoleBindingHandlerFunc)
+	AddHandler(name string, handler RoleBindingHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler RoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -55,17 +56,19 @@ type RoleBindingController interface {
 type RoleBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.RoleBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RoleBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleBindingController
-	AddSyncHandler(sync RoleBindingHandlerFunc)
+	AddHandler(name string, sync RoleBindingHandlerFunc)
 	AddLifecycle(name string, lifecycle RoleBindingLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync RoleBindingHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle RoleBindingLifecycle)
 }
 
 type roleBindingLister struct {
@@ -109,8 +112,8 @@ func (c *roleBindingController) Lister() RoleBindingLister {
 	}
 }
 
-func (c *roleBindingController) AddHandler(handler RoleBindingHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *roleBindingController) AddHandler(name string, handler RoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -118,6 +121,24 @@ func (c *roleBindingController) AddHandler(handler RoleBindingHandlerFunc) {
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.RoleBinding))
+	})
+}
+
+func (c *roleBindingController) AddClusterScopedHandler(name, cluster string, handler RoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.RoleBinding))
 	})
 }
@@ -176,8 +197,8 @@ func (s *roleBindingClient) Get(name string, opts metav1.GetOptions) (*v1.RoleBi
 	return obj.(*v1.RoleBinding), err
 }
 
-func (s *roleBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.RoleBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *roleBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.RoleBinding), err
 }
 
@@ -190,8 +211,8 @@ func (s *roleBindingClient) Delete(name string, options *metav1.DeleteOptions) e
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *roleBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *roleBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *roleBindingClient) List(opts metav1.ListOptions) (*RoleBindingList, error) {
@@ -213,11 +234,20 @@ func (s *roleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, l
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *roleBindingClient) AddSyncHandler(sync RoleBindingHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *roleBindingClient) AddHandler(name string, sync RoleBindingHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *roleBindingClient) AddLifecycle(name string, lifecycle RoleBindingLifecycle) {
-	sync := NewRoleBindingLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewRoleBindingLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *roleBindingClient) AddClusterScopedHandler(name, clusterName string, sync RoleBindingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *roleBindingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle RoleBindingLifecycle) {
+	sync := NewRoleBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }

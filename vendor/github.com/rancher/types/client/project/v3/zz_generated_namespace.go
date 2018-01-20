@@ -12,13 +12,11 @@ const (
 	NamespaceFieldCreatorID            = "creatorId"
 	NamespaceFieldDescription          = "description"
 	NamespaceFieldExternalID           = "externalId"
-	NamespaceFieldFinalizers           = "finalizers"
 	NamespaceFieldLabels               = "labels"
 	NamespaceFieldName                 = "name"
 	NamespaceFieldOwnerReferences      = "ownerReferences"
 	NamespaceFieldProjectID            = "projectId"
 	NamespaceFieldPrune                = "prune"
-	NamespaceFieldReleases             = "releases"
 	NamespaceFieldRemoved              = "removed"
 	NamespaceFieldState                = "state"
 	NamespaceFieldStatus               = "status"
@@ -37,13 +35,11 @@ type Namespace struct {
 	CreatorID            string                 `json:"creatorId,omitempty"`
 	Description          string                 `json:"description,omitempty"`
 	ExternalID           string                 `json:"externalId,omitempty"`
-	Finalizers           []string               `json:"finalizers,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty"`
 	Name                 string                 `json:"name,omitempty"`
 	OwnerReferences      []OwnerReference       `json:"ownerReferences,omitempty"`
 	ProjectID            string                 `json:"projectId,omitempty"`
 	Prune                *bool                  `json:"prune,omitempty"`
-	Releases             map[string]ReleaseInfo `json:"releases,omitempty"`
 	Removed              string                 `json:"removed,omitempty"`
 	State                string                 `json:"state,omitempty"`
 	Status               *NamespaceStatus       `json:"status,omitempty"`

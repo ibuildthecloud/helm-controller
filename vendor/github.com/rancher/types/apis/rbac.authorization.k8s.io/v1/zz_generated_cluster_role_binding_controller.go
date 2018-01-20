@@ -45,7 +45,8 @@ type ClusterRoleBindingLister interface {
 type ClusterRoleBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRoleBindingLister
-	AddHandler(handler ClusterRoleBindingHandlerFunc)
+	AddHandler(name string, handler ClusterRoleBindingHandlerFunc)
+	AddClusterScopedHandler(name, clusterName string, handler ClusterRoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -54,17 +55,19 @@ type ClusterRoleBindingController interface {
 type ClusterRoleBindingInterface interface {
 	ObjectClient() *clientbase.ObjectClient
 	Create(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
-	GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
 	Update(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error
+	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRoleBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleBindingController
-	AddSyncHandler(sync ClusterRoleBindingHandlerFunc)
+	AddHandler(name string, sync ClusterRoleBindingHandlerFunc)
 	AddLifecycle(name string, lifecycle ClusterRoleBindingLifecycle)
+	AddClusterScopedHandler(name, clusterName string, sync ClusterRoleBindingHandlerFunc)
+	AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterRoleBindingLifecycle)
 }
 
 type clusterRoleBindingLister struct {
@@ -108,8 +111,8 @@ func (c *clusterRoleBindingController) Lister() ClusterRoleBindingLister {
 	}
 }
 
-func (c *clusterRoleBindingController) AddHandler(handler ClusterRoleBindingHandlerFunc) {
-	c.GenericController.AddHandler(func(key string) error {
+func (c *clusterRoleBindingController) AddHandler(name string, handler ClusterRoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
 		obj, exists, err := c.Informer().GetStore().GetByKey(key)
 		if err != nil {
 			return err
@@ -117,6 +120,24 @@ func (c *clusterRoleBindingController) AddHandler(handler ClusterRoleBindingHand
 		if !exists {
 			return handler(key, nil)
 		}
+		return handler(key, obj.(*v1.ClusterRoleBinding))
+	})
+}
+
+func (c *clusterRoleBindingController) AddClusterScopedHandler(name, cluster string, handler ClusterRoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(name, func(key string) error {
+		obj, exists, err := c.Informer().GetStore().GetByKey(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return handler(key, nil)
+		}
+
+		if !controller.ObjectInCluster(cluster, obj) {
+			return nil
+		}
+
 		return handler(key, obj.(*v1.ClusterRoleBinding))
 	})
 }
@@ -175,8 +196,8 @@ func (s *clusterRoleBindingClient) Get(name string, opts metav1.GetOptions) (*v1
 	return obj.(*v1.ClusterRoleBinding), err
 }
 
-func (s *clusterRoleBindingClient) GetNamespace(name, namespace string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error) {
-	obj, err := s.objectClient.GetNamespace(name, namespace, opts)
+func (s *clusterRoleBindingClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error) {
+	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
 	return obj.(*v1.ClusterRoleBinding), err
 }
 
@@ -189,8 +210,8 @@ func (s *clusterRoleBindingClient) Delete(name string, options *metav1.DeleteOpt
 	return s.objectClient.Delete(name, options)
 }
 
-func (s *clusterRoleBindingClient) DeleteNamespace(name, namespace string, options *metav1.DeleteOptions) error {
-	return s.objectClient.DeleteNamespace(name, namespace, options)
+func (s *clusterRoleBindingClient) DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error {
+	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
 func (s *clusterRoleBindingClient) List(opts metav1.ListOptions) (*ClusterRoleBindingList, error) {
@@ -212,11 +233,20 @@ func (s *clusterRoleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOpt
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterRoleBindingClient) AddSyncHandler(sync ClusterRoleBindingHandlerFunc) {
-	s.Controller().AddHandler(sync)
+func (s *clusterRoleBindingClient) AddHandler(name string, sync ClusterRoleBindingHandlerFunc) {
+	s.Controller().AddHandler(name, sync)
 }
 
 func (s *clusterRoleBindingClient) AddLifecycle(name string, lifecycle ClusterRoleBindingLifecycle) {
-	sync := NewClusterRoleBindingLifecycleAdapter(name, s, lifecycle)
-	s.AddSyncHandler(sync)
+	sync := NewClusterRoleBindingLifecycleAdapter(name, false, s, lifecycle)
+	s.AddHandler(name, sync)
+}
+
+func (s *clusterRoleBindingClient) AddClusterScopedHandler(name, clusterName string, sync ClusterRoleBindingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+}
+
+func (s *clusterRoleBindingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterRoleBindingLifecycle) {
+	sync := NewClusterRoleBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.AddClusterScopedHandler(name, clusterName, sync)
 }
